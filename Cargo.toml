@@ -1,0 +1,21 @@
+[package]
+name = "web-agent-mcp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+html2md = "0.2.17"
+reqwest = { version = "0.12", features = ["blocking", "json", "gzip"] }
+scraper = "0.27"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+urlencoding = "2.1"
+open = "5"
+readability = "0.3"
+url = "2.5"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
