@@ -2,7 +2,7 @@
 
 set -e
 
-# Installer for web-agent-mcp
+# Installer for web-searcher
 # Builds the project and installs the binary to ~/.mcp/web-searcher by default
 
 PROJECT_NAME="web-searcher"

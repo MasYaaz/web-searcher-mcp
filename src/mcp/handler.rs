@@ -60,17 +60,13 @@ pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
                     },
                     {
                       "name": "fetch_web_content",
-                      "description": "Membaca konten halaman web ke format Markdown bersih. Berikan parameter 'query' untuk menyaring bagian teks yang relevan.",
+                      "description": "Membaca konten halaman web dan mengonversinya ke format Markdown bersih.",
                       "inputSchema": {
                         "type": "object",
                         "properties": {
                           "url": {
                             "type": "string",
                             "description": "URL lengkap halaman web (http/https)"
-                          },
-                          "query": {
-                            "type": "string",
-                            "description": "Topik spesifik untuk menyaring teks artikel"
                           }
                         },
                         "required": ["url"]
@@ -105,12 +101,11 @@ pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
                 }
                 "fetch_web_content" => {
                     let u = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
-                    let q = args.get("query").and_then(|v| v.as_str());
 
                     if u.trim().is_empty() {
                         "Error: Parameter 'url' tidak boleh kosong.".to_string()
                     } else {
-                        fetch_markdown(u, q)
+                        fetch_markdown(u)
                     }
                 }
                 _ => format!("Error: Tool '{}' tidak ditemukan.", tool_name),

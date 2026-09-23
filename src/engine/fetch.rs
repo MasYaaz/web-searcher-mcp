@@ -1,4 +1,3 @@
-use crate::engine::embedding::semantic_filter_content;
 use crate::utils::http::build_http_client;
 use crate::utils::sanitizer::clean_markdown_content;
 use crate::utils::security::validate_public_url;
@@ -20,7 +19,7 @@ fn fallback_dom_cleaner(raw_html: &str) -> String {
     clean_html
 }
 
-pub fn fetch_markdown(url: &str, query: Option<&str>) -> String {
+pub fn fetch_markdown(url: &str) -> String {
     // 1. SSRF Guard
     if let Err(err_msg) = validate_public_url(url) {
         return format!("Error Keamanan: {}", err_msg);
@@ -84,15 +83,7 @@ pub fn fetch_markdown(url: &str, query: Option<&str>) -> String {
         clean_markdown_content(&raw_md)
     };
 
-    // 6. Semantic Filter (Jika query RAG disediakan)
-    if let Some(q) = query {
-        let trimmed_q = q.trim();
-        if !trimmed_q.is_empty() {
-            return semantic_filter_content(trimmed_q, &md, 5);
-        }
-    }
-
-    // 7. Token Char Limiting (UTF-8 Safe)
+    // 6. Token Char Limiting (UTF-8 Safe)
     let char_limit = 12000;
     let mut chars = md.chars();
     let truncated: String = chars.by_ref().take(char_limit).collect();

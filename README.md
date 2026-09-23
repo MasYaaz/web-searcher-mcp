@@ -21,7 +21,7 @@ Server ini berjalan lewat stdio, jadi bisa dipakai oleh MCP client seperti Claud
 
 ## Instalasi
 
-Build dan install ke `~/.mcp/rust-mcp/web-searcher`:
+Build dan install ke `~/.mcp/web-searcher`:
 
 ```bash
 ./install.sh
@@ -36,7 +36,7 @@ cargo build --release
 Binary hasil build ada di:
 
 ```text
-target/release/web-agent-mcp
+target/release/web-searcher
 ```
 
 ## Konfigurasi MCP
@@ -47,7 +47,7 @@ Contoh konfigurasi MCP client:
 {
   "mcpServers": {
     "web-agent-mcp": {
-      "command": "/home/USER/.mcp/web-searcher"
+      "command": "/home/.mcp/web-searcher"
     }
   }
 }
@@ -89,45 +89,15 @@ Input:
 
 ```json
 {
-  "url": "https://example.com/article",
-  "query": "bagian yang relevan"
+  "url": "https://example.com/article"
 }
 ```
 
 Parameter:
 
-| Nama    | Wajib | Default | Keterangan                                                          |
-| ------- | ----- | ------- | ------------------------------------------------------------------- |
-| `url`   | Ya    | -       | URL lengkap `http` atau `https`                                     |
-| `query` | Tidak | -       | Jika diisi, konten difilter secara semantik memakai embedding lokal |
-
-## Embedding Opsional
-
-Jika `fetch_web_content` diberi `query`, server mencoba mengambil embedding dari:
-
-```text
-http://127.0.0.1:8081
-```
-
-Override dengan:
-
-```bash
-export LLAMA_EMBED_URL="http://127.0.0.1:8081"
-```
-
-Server mencoba endpoint native llama.cpp:
-
-```text
-/embedding
-```
-
-Lalu fallback ke endpoint kompatibel OpenAI:
-
-```text
-/v1/embeddings
-```
-
-Kalau embedding server offline, tool tetap mengembalikan Markdown biasa.
+| Nama  | Wajib | Default | Keterangan                      |
+| ----- | ----- | ------- | ------------------------------- |
+| `url` | Ya    | -       | URL lengkap `http` atau `https` |
 
 ## Development
 
@@ -138,9 +108,3 @@ cargo run
 ```
 
 Server membaca JSON-RPC per baris dari stdin dan menulis response JSON-RPC ke stdout.
-
-## Catatan
-
-- DuckDuckGo bisa memicu CAPTCHA. Jika terjadi, server mencoba membuka browser ke DuckDuckGo HTML.
-- `fetch_web_content` memblokir localhost, IP private, link-local, broadcast, unspecified, dan range CGNAT.
-- Halaman dengan Cloudflare atau bot challenge biasanya tidak bisa dibaca langsung.
