@@ -11,13 +11,11 @@ Server ini berjalan lewat stdio, jadi bisa dipakai oleh MCP client seperti Claud
 - Filter waktu pencarian: `day`, `week`, `month`, atau `year`.
 - Filter wilayah DuckDuckGo, default `id-id`.
 - SSRF guard untuk memblokir URL lokal/private saat fetch konten.
-- Filter semantik opsional memakai llama.cpp embedding server.
 
 ## Kebutuhan
 
 - Rust toolchain dengan `cargo`
 - Koneksi internet untuk pencarian/fetch web
-- Opsional: llama.cpp embedding server untuk filter semantik saat memakai parameter `query` di `fetch_web_content`
 
 ## Instalasi
 
