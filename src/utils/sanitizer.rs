@@ -1,3 +1,28 @@
+//! Module for sanitizing text, HTML entities, and Markdown contents.
+//!
+//! This module provides string manipulation routines to decode common HTML entities,
+//! strip HTML tags while preserving inline code blocks, remove Wikipedia-style inline citation brackets,
+//! and clean raw Markdown content from scripts, tracking pixels, ads, and navigation noise.
+
+/// Decodes common named and numeric HTML entities into their corresponding UTF-8 characters.
+///
+/// # Supported Entities:
+/// * `&nbsp;` -> `" "`
+/// * `&quot;` -> `"`
+/// * `&amp;` -> `&`
+/// * `&lt;` -> `<`
+/// * `&gt;` -> `>`
+/// * `&#39;` / `&apos;` -> `'`
+/// * `&mdash;` -> `—`
+/// * `&ndash;` -> `–`
+/// * `&bull;` -> `•`
+/// * `&copy;` -> `©`
+///
+/// # Arguments
+/// * `input` - The input string containing potential HTML entities.
+///
+/// # Returns
+/// A `String` with recognized HTML entities converted to UTF-8 characters.
 pub fn decode_html_entities(input: &str) -> String {
     if !input.contains('&') {
         return input.to_string();
@@ -57,6 +82,15 @@ pub fn decode_html_entities(input: &str) -> String {
     output
 }
 
+/// Strips HTML tags from input text while preserving literal code blocks enclosed in backticks (` ` `).
+///
+/// Handles quoted attributes within HTML tags to avoid prematurely breaking out of tag sequences.
+///
+/// # Arguments
+/// * `input` - The text string potentially containing HTML tags.
+///
+/// # Returns
+/// A `String` stripped of HTML markup.
 pub fn strip_html_tags_safely(input: &str) -> String {
     if !input.contains('<') {
         return input.to_string();
@@ -100,6 +134,14 @@ pub fn strip_html_tags_safely(input: &str) -> String {
     clean
 }
 
+/// Removes Wikipedia-style footnote citations (e.g., `[1]`, `[^2]`, `[citation needed]`, `[note 1]`)
+/// while preserving standard Markdown links (`[text](url)`).
+///
+/// # Arguments
+/// * `input` - The text string containing inline citations.
+///
+/// # Returns
+/// A `String` with citation brackets removed.
 pub fn remove_wiki_citations(input: &str) -> String {
     if !input.contains('[') {
         return input.to_string();
@@ -117,6 +159,7 @@ pub fn remove_wiki_citations(input: &str) -> String {
                 if next_c == ']' {
                     chars.next();
 
+                    // If followed by '(', it is a standard Markdown link [text](url); keep it.
                     if chars.peek() == Some(&'(') {
                         temp.push(']');
                         break;
@@ -127,6 +170,7 @@ pub fn remove_wiki_citations(input: &str) -> String {
 
                     if inner_no_caret.chars().all(|ch| ch.is_ascii_digit() || ch == ',' || ch == ' ' || ch == '-')
                         || inner == "rujukan?"
+                        || inner == "citation needed"
                         || inner.starts_with("catatan")
                         || inner.starts_with("note")
                     {
@@ -153,6 +197,14 @@ pub fn remove_wiki_citations(input: &str) -> String {
     output
 }
 
+/// Cleans raw Markdown text by filtering ad scripts, tracking code, edit buttons,
+/// empty image anchors, social sharing prompts, and policy footers.
+///
+/// # Arguments
+/// * `raw_md` - The raw converted Markdown string.
+///
+/// # Returns
+/// A cleaned, double-newline joined Markdown string optimized for LLM processing.
 pub fn clean_markdown_content(raw_md: &str) -> String {
     let mut cleaned_lines = Vec::new();
     let mut in_code_block = false;
@@ -171,7 +223,7 @@ pub fn clean_markdown_content(raw_md: &str) -> String {
             continue;
         }
 
-        // Filter noise, script/style leak, dan metadata
+        // Filter scripts, ad leaks, tracking tags, and noise metadata
         if trimmed.contains("adsbygoogle")
             || trimmed.contains("googletag")
             || trimmed.contains("window.")
@@ -189,8 +241,11 @@ pub fn clean_markdown_content(raw_md: &str) -> String {
             || trimmed.starts_with("Follow us")
             || trimmed.starts_with("Cookie Policy")
             || trimmed.starts_with("Kebijakan Privasi")
+            || trimmed.starts_with("Privacy Policy")
             || trimmed.starts_with("Halaman ini terakhir diubah")
+            || trimmed.starts_with("This page was last edited")
             || trimmed.starts_with("Daftar isi")
+            || trimmed.starts_with("Table of contents")
         {
             continue;
         }
@@ -200,6 +255,7 @@ pub fn clean_markdown_content(raw_md: &str) -> String {
         let citation_cleaned = remove_wiki_citations(&decoded);
         let line_clean = citation_cleaned.trim().to_string();
 
+        // Remove empty links, images, or broken paths
         if line_clean.starts_with("[ ](")
             || line_clean.starts_with("[](")
             || (line_clean.starts_with("![") && line_clean.ends_with(')'))
@@ -208,6 +264,7 @@ pub fn clean_markdown_content(raw_md: &str) -> String {
             continue;
         }
 
+        // Remove short menu/navigation list links
         if (line_clean.starts_with("* [") || line_clean.starts_with("- ["))
             && line_clean.ends_with(')')
             && line_clean.len() < 50

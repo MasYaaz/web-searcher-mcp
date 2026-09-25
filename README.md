@@ -1,45 +1,45 @@
 # Web Searcher
 
-MCP server kecil untuk mencari web lewat DuckDuckGo HTML dan mengambil isi halaman web sebagai Markdown bersih.
+A small MCP server for searching the web via DuckDuckGo HTML and extracting web page content as clean Markdown.
 
-Server ini berjalan lewat stdio, jadi bisa dipakai oleh MCP client seperti Claude Desktop, Cursor, atau client lain yang mendukung konfigurasi `mcpServers`.
+This server runs over stdio, so it can be used by MCP clients such as Claude Desktop, Cursor, or any client that supports the mcpServers configuration.
 
-## Fitur
+## Features
 
-- `web_search`: mencari hasil web dari DuckDuckGo HTML.
-- `fetch_web_content`: membaca URL publik dan mengubah konten utamanya ke Markdown.
-- Filter waktu pencarian: `day`, `week`, `month`, atau `year`.
-- Filter wilayah DuckDuckGo, default `id-id`.
-- SSRF guard untuk memblokir URL lokal/private saat fetch konten.
+- `web_search`: Search the web using DuckDuckGo HTML.
+- `fetch_web_content`: Read a public URL and convert its main content to Markdown.
+- Search time filters: `day`, `week`, `month`, or `year`.
+- DuckDuckGo region filter, default is `id-id`.
+- SSRF guard to block local/private URLs when fetching content.
 
-## Kebutuhan
+## Requirements
 
-- Rust toolchain dengan `cargo`
-- Koneksi internet untuk pencarian/fetch web
+- Rust toolchain with `cargo`
+- Internet connection for search/fetch
 
-## Instalasi
+## Installation
 
-Build dan install ke `~/.mcp/web-searcher`:
+Build and install to `~/.mcp/web-searcher`:
 
 ```bash
 ./install.sh
 ```
 
-Atau build manual:
+Or build manually:
 
 ```bash
 cargo build --release
 ```
 
-Binary hasil build ada di:
+The resulting binary will be at:
 
 ```text
 target/release/web-searcher
 ```
 
-## Konfigurasi MCP
+## MCP Configuration
 
-Contoh konfigurasi MCP client:
+Example MCP client configuration:
 
 ```json
 {
@@ -51,13 +51,13 @@ Contoh konfigurasi MCP client:
 }
 ```
 
-Ganti `command` dengan path binary di mesin kamu.
+Replace `command` with the binary path on your machine.
 
 ## Tools
 
 ### `web_search`
 
-Mencari informasi di DuckDuckGo.
+Search for information on DuckDuckGo.
 
 Input:
 
@@ -70,18 +70,18 @@ Input:
 }
 ```
 
-Parameter:
+Parameters:
 
-| Nama          | Wajib | Default | Keterangan                                                |
-| ------------- | ----- | ------- | --------------------------------------------------------- |
-| `query`       | Ya    | -       | Kata kunci pencarian                                      |
-| `max_results` | Tidak | `15`    | Jumlah maksimal hasil                                     |
-| `time_range`  | Tidak | -       | `day`, `week`, `month`, atau `year`                       |
-| `region`      | Tidak | `id-id` | Kode wilayah DuckDuckGo, contoh `id-id`, `us-en`, `wt-wt` |
+| Name          | Required | Default | Description                                    |
+| ------------- | -------- | ------- | ---------------------------------------------- |
+| `query`       | Yes      | -       | Search keywords                                |
+| `max_results` | No       | `15`    | Maximum number of results                      |
+| `time_range`  | No       | -       | `day`, `week`, `month`, or `year`              |
+| `region`      | No       | `id-id` | DuckDuckGo region code, e.g., `id-id`, `us-en` |
 
 ### `fetch_web_content`
 
-Mengambil halaman web publik dan mengembalikan Markdown.
+Fetch a public web page and return its content as Markdown.
 
 Input:
 
@@ -91,11 +91,11 @@ Input:
 }
 ```
 
-Parameter:
+Parameters:
 
-| Nama  | Wajib | Default | Keterangan                      |
-| ----- | ----- | ------- | ------------------------------- |
-| `url` | Ya    | -       | URL lengkap `http` atau `https` |
+| Name  | Required | Default | Description                |
+| ----- | -------- | ------- | -------------------------- |
+| `url` | Yes      | -       | Full `http` or `https` URL |
 
 ## Development
 
@@ -105,4 +105,6 @@ cargo build
 cargo run
 ```
 
-Server membaca JSON-RPC per baris dari stdin dan menulis response JSON-RPC ke stdout.
+The server reads JSON-RPC line by line from stdin and writes the JSON-RPC response to stdout.
+
+---

@@ -1,13 +1,31 @@
+//! JSON-RPC 2.0 Request Dispatcher and MCP Protocol Handler.
+//!
+//! This module parses incoming JSON-RPC requests, routes Model Context Protocol (MCP) methods
+//! (`initialize`, `ping`, `tools/list`, `tools/call`), executes tool invocations against the web engine,
+//! and returns formatted JSON-RPC responses.
+
 use crate::engine::fetch::fetch_markdown;
 use crate::engine::search::search_web;
 use serde_json::{json, Value};
 
+/// Handles incoming JSON-RPC 2.0 requests for the MCP Web Agent.
+///
+/// Filters out notifications (requests missing an `id` or starting with `notifications/`),
+/// dispatches supported protocol methods (`initialize`, `ping`, `tools/list`, `tools/call`),
+/// and returns a JSON `Value` response.
+///
+/// # Arguments
+/// * `req_text` - A string slice containing the raw JSON-RPC request payload.
+///
+/// # Returns
+/// * `Some(Value)` - A structured JSON-RPC 2.0 response object.
+/// * `None` - If the request text is invalid JSON or is a JSON-RPC notification.
 pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
     let req: Value = serde_json::from_str(req_text).ok()?;
     let id = req.get("id").cloned();
     let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
 
-    // Abaikan semua JSON-RPC notification (tidak memiliki ID atau berawalan notifications/)
+    // Ignore all JSON-RPC notifications (missing an ID or starting with notifications/)
     if id.is_none() || method.starts_with("notifications/") {
         return None;
     }
@@ -33,26 +51,26 @@ pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
                 "tools": [
                     {
                         "name": "web_search",
-                        "description": "Mencari informasi di DuckDuckGo dengan filter rentang waktu dan wilayah untuk mendapatkan informasi yang relevan dan terkini.",
+                        "description": "Searches for information on DuckDuckGo with time-range and region filters to obtain relevant and up-to-date search results.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "query": {
                                     "type": "string",
-                                    "description": "Kata kunci pencarian spesifik"
+                                    "description": "Specific search keywords or terms"
                                 },
                                 "max_results": {
                                     "type": "integer",
-                                    "description": "Jumlah maksimal tautan yang dikembalikan (default: 15)"
+                                    "description": "Maximum number of search results to return (default: 15)"
                                 },
                                 "time_range": {
                                     "type": "string",
                                     "enum": ["day", "week", "month", "year"],
-                                    "description": "Filter publikasi: 'day' (24 jam terakhir), 'week' (1 minggu), 'month' (1 bulan), 'year' (1 tahun)"
+                                    "description": "Publication time filter: 'day' (past 24h), 'week' (past week), 'month' (past month), 'year' (past year)"
                                 },
                                 "region": {
                                     "type": "string",
-                                    "description": "Kode wilayah bahasa/negara (contoh: 'id-id' untuk Indonesia, 'us-en' untuk US/Global, 'wt-wt' tanpa filter wilayah)"
+                                    "description": "Language/country region code (e.g., 'us-en' for US/Global, 'id-id' for Indonesia, 'wt-wt' for no region filter)"
                                 }
                             },
                             "required": ["query"]
@@ -60,13 +78,13 @@ pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
                     },
                     {
                       "name": "fetch_web_content",
-                      "description": "Membaca konten halaman web dan mengonversinya ke format Markdown bersih.",
+                      "description": "Fetches and parses webpage content, converting it into clean, sanitized Markdown format.",
                       "inputSchema": {
                         "type": "object",
                         "properties": {
                           "url": {
                             "type": "string",
-                            "description": "URL lengkap halaman web (http/https)"
+                            "description": "Full webpage URL (http/https)"
                           }
                         },
                         "required": ["url"]
@@ -84,7 +102,7 @@ pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
                 "web_search" => {
                     let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
 
-                    // Parsing fleksibel (mendukung integer u64 maupun i64)
+                    // Flexible limit parsing (supports u64 and positive i64)
                     let limit = args
                         .get("max_results")
                         .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i.max(1) as u64)))
@@ -94,7 +112,7 @@ pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
                     let region = args.get("region").and_then(|v| v.as_str());
 
                     if q.trim().is_empty() {
-                        "Error: Parameter 'query' tidak boleh kosong.".to_string()
+                        "Error: Parameter 'query' cannot be empty.".to_string()
                     } else {
                         search_web(q, limit, time_range, region)
                     }
@@ -103,12 +121,12 @@ pub fn handle_rpc_request(req_text: &str) -> Option<Value> {
                     let u = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
 
                     if u.trim().is_empty() {
-                        "Error: Parameter 'url' tidak boleh kosong.".to_string()
+                        "Error: Parameter 'url' cannot be empty.".to_string()
                     } else {
                         fetch_markdown(u)
                     }
                 }
-                _ => format!("Error: Tool '{}' tidak ditemukan.", tool_name),
+                _ => format!("Error: Tool '{}' not found.", tool_name),
             };
 
             json!({

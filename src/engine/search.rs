@@ -1,21 +1,42 @@
-use crate::utils::http::{build_http_client, open_browser_for_captcha};
-use crate::utils::sanitizer::{decode_html_entities,strip_html_tags_safely};
+//! Module for scraping DuckDuckGo HTML search results and Instant Answers.
+//!
+//! This module handles DuckDuckGo URL sanitization, bang quoting, CAPTCHA/challenge checks,
+//! zero-click abstract extraction, multi-page result pagination, and Markdown formatting.
+
+use crate::utils::http::build_http_client;
+use crate::utils::sanitizer::{decode_html_entities, strip_html_tags_safely};
 use scraper::{Html, Selector};
 use std::thread;
 use std::time::Duration;
 
+/// Base URL for DuckDuckGo HTML search endpoint.
 const DDG_HTML_URL: &str = "https://html.duckduckgo.com/html/";
 
+/// Cleans and extracts the actual target URL from a raw DuckDuckGo redirect link.
+///
+/// DuckDuckGo wraps search result links with redirect paths (e.g., `//duckduckgo.com/l/?uddg=...`).
+/// This function parses `uddg` parameters and performs form-urlencoded decoding.
+///
+/// # Arguments
+/// * `raw_link` - The raw href string extracted from the search result element.
+///
+/// # Returns
+/// A cleaned, fully-qualified URL string.
 pub fn clean_ddg_url(raw_link: &str) -> String {
-    if raw_link.contains("uddg=") {
-        if let Some(pos) = raw_link.find("uddg=") {
-            let encoded_part = &raw_link[pos + 5..];
-            let clean_encoded = encoded_part.split('&').next().unwrap_or(encoded_part);
-            if let Ok(decoded) = urlencoding::decode(clean_encoded) {
-                return decoded.into_owned();
-            }
+    if let Some(pos) = raw_link.find("uddg=") {
+        let encoded_part = &raw_link[pos + 5..];
+        let clean_encoded = encoded_part.split('&').next().unwrap_or(encoded_part);
+
+        // `url::form_urlencoded::parse` automatically performs URL decoding
+        let decoded = url::form_urlencoded::parse(clean_encoded.as_bytes())
+            .map(|(key, _)| key)
+            .collect::<String>();
+
+        if !decoded.is_empty() {
+            return decoded;
         }
     }
+
     if raw_link.starts_with("//") {
         format!("https:{}", raw_link)
     } else {
@@ -23,6 +44,14 @@ pub fn clean_ddg_url(raw_link: &str) -> String {
     }
 }
 
+/// Escapes DuckDuckGo search bangs (e.g., `!wiki`) by wrapping them in single quotes
+/// to prevent DuckDuckGo from executing accidental redirects instead of text searches.
+///
+/// # Arguments
+/// * `query` - The input search query string.
+///
+/// # Returns
+/// A query string with bang terms quoted.
 pub fn quote_ddg_bangs(query: &str) -> String {
     let mut parts = Vec::new();
     for word in query.split_whitespace() {
@@ -35,11 +64,13 @@ pub fn quote_ddg_bangs(query: &str) -> String {
     parts.join(" ")
 }
 
+/// Checks if the response HTML contains a DuckDuckGo CAPTCHA or bot challenge modal.
 fn check_is_captcha(document: &Html) -> bool {
     let challenge_selector = Selector::parse("form#challenge-form, .captcha-modal").unwrap();
     document.select(&challenge_selector).next().is_some()
 }
 
+/// Extracts Instant Answer snippets (zero-click abstract) from DuckDuckGo search results if available.
 fn extract_zero_click(document: &Html) -> Option<String> {
     let zero_click_selector = Selector::parse("#zero_click_abstract").unwrap();
     let zc_el = document.select(&zero_click_selector).next()?;
@@ -51,12 +82,13 @@ fn extract_zero_click(document: &Html) -> Option<String> {
         && !zc_text.contains("Your IP address is")
         && !zc_text.contains("Your user agent:")
     {
-        Some(format!("> **Jawaban Instan:**\n> {}\n\n---\n\n", zc_text))
+        Some(format!("> **Instant Answer:**\n> {}\n\n---\n\n", zc_text))
     } else {
         None
     }
 }
 
+/// Extracts hidden form parameters required to request subsequent result pages.
 fn extract_next_page_payload(document: &Html) -> Option<Vec<(String, String)>> {
     let form_selector = Selector::parse(".nav-link form, form").unwrap();
     let input_selector = Selector::parse("input").unwrap();
@@ -84,6 +116,7 @@ fn extract_next_page_payload(document: &Html) -> Option<Vec<(String, String)>> {
     None
 }
 
+/// Parses search result items from a single page HTML document and formats them into Markdown headers.
 fn parse_search_results(
     document: &Html,
     limit: usize,
@@ -117,7 +150,7 @@ fn parse_search_results(
             if !title.trim().is_empty() && !raw_href.is_empty() {
                 let full_url = clean_ddg_url(raw_href);
                 let clean_snippet = if snippet.trim().is_empty() {
-                    "*(Tidak ada ringkasan teks tersedia)*".to_string()
+                    "*(No text snippet available)*".to_string()
                 } else {
                     snippet.trim().to_string()
                 };
@@ -125,7 +158,6 @@ fn parse_search_results(
                 *current_count += 1;
                 page_items += 1;
 
-                // Ditambahkan penomoran [1], [2], dst.
                 output.push_str(&format!(
                     "### [{}] [{}]({})\n{}\n\n",
                     *current_count,
@@ -144,6 +176,7 @@ fn parse_search_results(
     (output, page_items)
 }
 
+/// Maps input time range strings to DuckDuckGo date filter parameters (`df`).
 fn map_time_range(range: &str) -> &'static str {
     match range.trim().to_lowercase().as_str() {
         "d" | "day" | "hari" => "d",
@@ -154,6 +187,19 @@ fn map_time_range(range: &str) -> &'static str {
     }
 }
 
+/// Performs a web search on DuckDuckGo and formats the result as Markdown.
+///
+/// Handles search pagination, CAPTCHA protection checks, time/region filtering,
+/// and query length validation.
+///
+/// # Arguments
+/// * `raw_query` - The search query string.
+/// * `limit` - Maximum number of search results to retrieve.
+/// * `time_range` - Optional time filter (`"d"`, `"w"`, `"m"`, `"y"`).
+/// * `region` - Optional regional location code (defaults to `"id-id"`).
+///
+/// # Returns
+/// A `String` containing the Markdown-formatted search results or an error message.
 pub fn search_web(
     raw_query: &str,
     limit: usize,
@@ -162,7 +208,7 @@ pub fn search_web(
 ) -> String {
     let query = quote_ddg_bangs(raw_query.trim());
     if query.len() >= 500 {
-        return "Error: Kueri pencarian melebihi batas 499 karakter DuckDuckGo.".to_string();
+        return "Error: Search query exceeds DuckDuckGo's 499 character limit.".to_string();
     }
 
     let client = match build_http_client(12) {
@@ -201,7 +247,7 @@ pub fn search_web(
             Ok(res) => res.bytes().unwrap_or_default(),
             Err(e) => {
                 if count == 0 {
-                    return format!("Koneksi ke DuckDuckGo gagal: {}", e);
+                    return format!("Failed to connect to DuckDuckGo: {}", e);
                 }
                 break;
             }
@@ -210,10 +256,10 @@ pub fn search_web(
         let html_content = String::from_utf8_lossy(&bytes).to_string();
         let document = Html::parse_document(&html_content);
 
+        // Check for CAPTCHA or Bot Challenge
         if check_is_captcha(&document) {
-            open_browser_for_captcha();
             if count == 0 {
-                return "DuckDuckGo memicu CAPTCHA. Browser dibuka otomatis ke: https://html.duckduckgo.com/html".to_string();
+                return "Search request was blocked by DuckDuckGo security protection (CAPTCHA/Bot Challenge).".to_string();
             }
             break;
         }
@@ -241,7 +287,7 @@ pub fn search_web(
     }
 
     if output.is_empty() {
-        "Tidak ada hasil pencarian ditemukan.".to_string()
+        "No search results found.".to_string()
     } else {
         output
     }

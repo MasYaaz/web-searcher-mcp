@@ -6,7 +6,7 @@ set -e
 # Builds the project and installs the binary to ~/.mcp/web-searcher by default
 
 PROJECT_NAME="web-searcher"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.mcp/$PROJECT_NAME}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.mcp}"
 VERBOSE="${VERBOSE:-0}"
 
 log() { echo -e "[INFO] $1"; }
