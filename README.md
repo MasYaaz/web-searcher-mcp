@@ -1,4 +1,5 @@
 # Web Searcher
+[![M8ven Score](https://m8ven.ai/badge/mcp/masyaaz-web-searcher-mcp-i1qpmc?v=32da506d9cefb67861d879f91283db79)](https://m8ven.ai/mcp/masyaaz-web-searcher-mcp-i1qpmc)
 
 A small MCP server for searching the web via DuckDuckGo HTML and extracting web page content as clean Markdown.
 
